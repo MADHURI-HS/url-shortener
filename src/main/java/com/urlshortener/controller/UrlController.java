@@ -6,6 +6,7 @@ import com.urlshortener.service.RateLimiterService;
 import com.urlshortener.service.UrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,9 @@ public class UrlController {
 
     private final UrlService urlService;
     private final RateLimiterService rateLimiterService;
+
+    @Value("${app.base-url:http://localhost:8080}")
+    private String baseUrl;
 
     public UrlController(UrlService urlService, RateLimiterService rateLimiterService) {
         this.urlService = urlService;
@@ -40,7 +44,7 @@ public class UrlController {
         }
 
         String code = urlService.shortenUrl(request.getLongUrl());
-        String shortUrl = "http://localhost:8080/" + code;
+        String shortUrl = baseUrl + "/" + code;
         return ResponseEntity.ok(new ShortenResponse(shortUrl, request.getLongUrl()));
     }
 

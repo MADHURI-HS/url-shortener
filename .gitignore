@@ -33,7 +33,7 @@ build/
 .vscode/
 
 ### Sensitive — never push credentials ###
-src/main/resources/application.properties
+src/main/resources/application-local.properties
 
 ### Mac ###
 .DS_Store
