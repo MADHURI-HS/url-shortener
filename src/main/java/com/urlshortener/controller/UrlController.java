@@ -52,15 +52,5 @@ public class UrlController {
     @GetMapping("/ping")
     public String ping() { return "pong"; }
 
-    @GetMapping("/{code}")
-    public ResponseEntity<Void> redirect(@PathVariable String code) {
-        String longUrl = urlService.getLongUrl(code);
-        if (longUrl == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity
-                .status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, longUrl)
-                .build();
-    }
+
 }
