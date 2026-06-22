@@ -48,11 +48,6 @@ public class UrlController {
         return ResponseEntity.ok(new ShortenResponse(shortUrl, request.getLongUrl()));
     }
 
-    @GetMapping("/")
-    public String home() {
-        return "URL Shortener API is live. POST /shorten to create a short link, or GET /ping for a health check.";
-    }
-
     @GetMapping("/ping")
     public String ping() { return "pong"; }
 

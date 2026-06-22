@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener — Live API</title>
+    <style>
+        :root {
+          --paper: #FAF8F3;
+          --ink: #1A1A1A;
+          --ink-soft: #5A5650;
+          --accent: #2D5F4C;
+          --accent-soft: #E8EFE9;
+          --rule: #DDD8CC;
+          --mono: 'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+          --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+          margin: 0;
+          background: var(--paper);
+          color: var(--ink);
+          font-family: var(--sans);
+          line-height: 1.5;
+          -webkit-font-smoothing: antialiased;
+        }
+
+        .wrap {
+          max-width: 640px;
+          margin: 0 auto;
+          padding: 64px 24px 80px;
+        }
+
+        .alphabet {
+          font-family: var(--mono);
+          font-size: 11px;
+          letter-spacing: 0.12em;
+          color: var(--ink-soft);
+          word-break: break-all;
+          margin-bottom: 40px;
+          opacity: 0.7;
+        }
+
+        .alphabet span {
+          color: var(--accent);
+          font-weight: 600;
+        }
+
+        h1 {
+          font-family: var(--mono);
+          font-size: 32px;
+          font-weight: 700;
+          letter-spacing: -0.01em;
+          margin: 0 0 8px;
+        }
+
+        .status-line {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 36px;
+        }
+
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--accent);
+          box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        .status-line p {
+          margin: 0;
+          color: var(--ink-soft);
+          font-size: 14px;
+        }
+
+        .card {
+          background: white;
+          border: 1px solid var(--rule);
+          border-radius: 4px;
+          padding: 28px;
+          margin-bottom: 32px;
+        }
+
+        .card label {
+          display: block;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: var(--ink-soft);
+          margin-bottom: 10px;
+        }
+
+        .input-row {
+          display: flex;
+          gap: 10px;
+        }
+
+        input[type="text"] {
+          flex: 1;
+          font-family: var(--mono);
+          font-size: 14px;
+          padding: 12px 14px;
+          border: 1px solid var(--rule);
+          border-radius: 3px;
+          background: var(--paper);
+          color: var(--ink);
+          outline: none;
+          transition: border-color 0.15s ease;
+        }
+
+        input[type="text"]:focus {
+          border-color: var(--accent);
+        }
+
+        button {
+          font-family: var(--sans);
+          font-size: 14px;
+          font-weight: 600;
+          padding: 12px 22px;
+          background: var(--ink);
+          color: var(--paper);
+          border: none;
+          border-radius: 3px;
+          cursor: pointer;
+          transition: background 0.15s ease;
+          white-space: nowrap;
+        }
+
+        button:hover { background: var(--accent); }
+        button:disabled { background: var(--rule); cursor: not-allowed; }
+
+        .result {
+          margin-top: 18px;
+          padding-top: 18px;
+          border-top: 1px dashed var(--rule);
+          display: none;
+        }
+
+        .result.show { display: block; }
+
+        .result-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          font-family: var(--mono);
+          font-size: 14px;
+        }
+
+        .result-row a {
+          color: var(--accent);
+          text-decoration: none;
+          word-break: break-all;
+        }
+
+        .result-row a:hover { text-decoration: underline; }
+
+        .copy-btn {
+          font-size: 12px;
+          padding: 6px 12px;
+          background: var(--accent-soft);
+          color: var(--accent);
+          flex-shrink: 0;
+        }
+
+        .copy-btn:hover { background: var(--accent); color: white; }
+
+        .error-msg {
+          color: #A33A3A;
+          font-size: 13px;
+          margin-top: 8px;
+          display: none;
+        }
+
+        .error-msg.show { display: block; }
+
+        .endpoints {
+          font-size: 13px;
+          color: var(--ink-soft);
+        }
+
+        .endpoints .eyebrow {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-soft);
+          margin-bottom: 14px;
+        }
+
+        .endpoint-row {
+          display: flex;
+          gap: 12px;
+          padding: 10px 0;
+          border-bottom: 1px solid var(--rule);
+        }
+
+        .endpoint-row:last-child { border-bottom: none; }
+
+        .method {
+          font-family: var(--mono);
+          font-size: 12px;
+          font-weight: 700;
+          color: var(--accent);
+          width: 44px;
+          flex-shrink: 0;
+        }
+
+        .endpoint-path {
+          font-family: var(--mono);
+          font-size: 13px;
+          color: var(--ink);
+        }
+
+        .endpoint-desc {
+          color: var(--ink-soft);
+          margin-left: auto;
+          text-align: right;
+        }
+
+        footer {
+          margin-top: 48px;
+          padding-top: 20px;
+          border-top: 1px solid var(--rule);
+          font-size: 12px;
+          color: var(--ink-soft);
+          display: flex;
+          justify-content: space-between;
+        }
+
+        footer a { color: var(--ink-soft); text-decoration: underline; }
+
+        @media (max-width: 480px) {
+          .wrap { padding: 40px 18px 60px; }
+          h1 { font-size: 26px; }
+          .input-row { flex-direction: column; }
+          .endpoint-desc { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <div class="alphabet">0123456789<span>abcdefghijklmnopqrstuvwxyz</span>ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
+
+    <h1>URL Shortener</h1>
+    <div class="status-line">
+        <span class="dot"></span>
+        <p>API live · PostgreSQL + Redis cache · rate-limited</p>
+    </div>
+
+    <div class="card">
+        <label for="longUrl">Paste a long URL</label>
+        <div class="input-row">
+            <input type="text" id="longUrl" placeholder="https://example.com/some/very/long/path" />
+            <button id="shortenBtn" onclick="shortenUrl()">Shorten</button>
+        </div>
+        <p class="error-msg" id="errorMsg">Something went wrong. Try again in a moment.</p>
+        <div class="result" id="result">
+            <div class="result-row">
+                <a id="shortLink" href="#" target="_blank" rel="noopener"></a>
+                <button class="copy-btn" onclick="copyLink()">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="endpoints">
+        <p class="eyebrow">API Reference</p>
+        <div class="endpoint-row">
+            <span class="method">POST</span>
+            <span class="endpoint-path">/shorten</span>
+            <span class="endpoint-desc">Create a short link</span>
+        </div>
+        <div class="endpoint-row">
+            <span class="method">GET</span>
+            <span class="endpoint-path">/{code}</span>
+            <span class="endpoint-desc">Redirect to original URL</span>
+        </div>
+        <div class="endpoint-row">
+            <span class="method">GET</span>
+            <span class="endpoint-path">/ping</span>
+            <span class="endpoint-desc">Health check</span>
+        </div>
+    </div>
+
+    <footer>
+        <span>Built with Spring Boot, PostgreSQL &amp; Redis</span>
+        <a href="https://github.com/MADHURI-HS/url-shortener" target="_blank" rel="noopener">Source on GitHub</a>
+    </footer>
+
+</div>
+
+<script>
+    async function shortenUrl() {
+      const input = document.getElementById('longUrl');
+      const btn = document.getElementById('shortenBtn');
+      const result = document.getElementById('result');
+      const errorMsg = document.getElementById('errorMsg');
+      const shortLink = document.getElementById('shortLink');
+
+      const longUrl = input.value.trim();
+      result.classList.remove('show');
+      errorMsg.classList.remove('show');
+
+      if (!longUrl) {
+        errorMsg.textContent = 'Paste a URL first.';
+        errorMsg.classList.add('show');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Shortening…';
+
+      try {
+        const res = await fetch('/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ longUrl })
+        });
+
+        if (!res.ok) throw new Error('Request failed');
+
+        const data = await res.json();
+        shortLink.textContent = data.shortUrl;
+        shortLink.href = data.shortUrl;
+        result.classList.add('show');
+      } catch (err) {
+        errorMsg.textContent = 'Could not shorten that URL. Check it\'s valid and try again.';
+        errorMsg.classList.add('show');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Shorten';
+      }
+    }
+
+    function copyLink() {
+      const link = document.getElementById('shortLink').textContent;
+      navigator.clipboard.writeText(link);
+      const btn = document.querySelector('.copy-btn');
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = original; }, 1500);
+    }
+
+    document.getElementById('longUrl').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') shortenUrl();
+    });
+</script>
+</body>
+</html>
