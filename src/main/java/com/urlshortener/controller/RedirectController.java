@@ -15,7 +15,7 @@ public class RedirectController {
         this.urlService = urlService;
     }
 
-    @GetMapping("/{code}")
+    @GetMapping("/{code:[a-zA-Z0-9]+}")
     public ResponseEntity<Void> redirect(@PathVariable String code) {
 
         String longUrl = urlService.getLongUrl(code);
