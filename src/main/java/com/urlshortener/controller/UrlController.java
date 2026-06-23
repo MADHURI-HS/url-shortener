@@ -7,7 +7,6 @@ import com.urlshortener.service.UrlService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +34,11 @@ public class UrlController {
             HttpServletRequest httpRequest) {
 
         // Get client IP
-        String clientIp = httpRequest.getRemoteAddr();
+        String clientIp = httpRequest.getHeader("X-Forwarded-For");
+
+        if (clientIp == null || clientIp.isEmpty()) {
+            clientIp = httpRequest.getRemoteAddr();
+        }
 
         // Check rate limit
         if (!rateLimiterService.tryConsume(clientIp)) {
