@@ -229,33 +229,6 @@ https://url-shortener-app-n9px.onrender.com/swagger-ui/index.html
 
 ---
 
-## 📸 Screenshots
-
-> Add screenshots after capturing them.
-
-```
-screenshots/
-├── home.png
-├── login.png
-├── register.png
-├── dashboard.png
-├── shorten-url.png
-└── swagger.png
-```
-
-Example
-
-```markdown
-## Home Page
-
-![Home](screenshots/home.png)
-
-## Dashboard
-
-![Dashboard](screenshots/dashboard.png)
-```
-
----
 
 ## 🚀 Future Enhancements
 
