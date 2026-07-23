@@ -20,16 +20,45 @@ public class Url {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @PrePersist  // ← runs automatically before every INSERT
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
     }
 
-    // Getters and setters
-    public Long getId() { return id; }
-    public String getShortCode() { return shortCode; }
-    public void setShortCode(String shortCode) { this.shortCode = shortCode; }
-    public String getLongUrl() { return longUrl; }
-    public void setLongUrl(String longUrl) { this.longUrl = longUrl; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public String getShortCode() {
+        return shortCode;
+    }
+
+    public void setShortCode(String shortCode) {
+        this.shortCode = shortCode;
+    }
+
+    public String getLongUrl() {
+        return longUrl;
+    }
+
+    public void setLongUrl(String longUrl) {
+        this.longUrl = longUrl;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+    public Long getId() {
+        return id;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    // Getters & Setters
 }
