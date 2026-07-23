@@ -1,122 +1,302 @@
-# URL Shortener
+# 🔗 URL Shortener
 
-A production-style URL shortening service built with Spring Boot, featuring Base62 encoding, Redis caching, and rate limiting — deployed live on Render.
+A production-ready URL Shortener application built with **Spring Boot**, **Spring Security**, **JWT Authentication**, **PostgreSQL**, **Redis**, and **Docker**. The application enables users to securely shorten URLs, manage their links, and redirect shortened URLs efficiently using caching and rate limiting.
 
-**🔗 Live demo:** https://url-shortener-9iuz.onrender.com
-**📦 Try it:** `POST /shorten` with `{ "longUrl": "https://example.com" }`
+## 🌐 Live Demo
 
-> Free-tier hosting note: the server spins down after periods of inactivity. The first request after idle time may take 30–50 seconds to respond while it wakes up.
+🔗 https://url-shortener-app-n9px.onrender.com
+
+## 📂 GitHub Repository
+
+🔗 https://github.com/MADHURI-HS/url-shortener
 
 ---
 
-## Features
+## ✨ Features
 
-- **URL shortening** — converts long URLs into short, unique codes using Base62 encoding
-- **Fast redirects** — Redis-backed caching sits in front of PostgreSQL, so repeated lookups skip the database entirely
-- **Rate limiting** — Bucket4j enforces per-client request limits using the token bucket algorithm
-- **Persistent storage** — PostgreSQL with Spring Data JPA for durable URL mappings
-- **Environment-based configuration** — Spring Profiles cleanly separate local development from production settings
-- **Containerized deployment** — Dockerized and deployed on Render, with Redis hosted on Upstash
+- 🔐 User Registration & Login
+- 🔑 JWT Authentication & Authorization
+- 🔒 BCrypt Password Encryption
+- 🔗 Shorten Long URLs
+- 🚀 Redirect to Original URLs
+- 📋 View User-Specific URLs
+- 🗑️ Delete Shortened URLs
+- ⚡ Redis Caching for Faster Redirects
+- 🚦 Bucket4j Rate Limiting
+- 🐳 Dockerized Application
+- ☁️ Cloud Deployment on Render
+- 📖 Swagger API Documentation
 
-## Tech Stack
+---
 
-| Layer | Technology |
-|---|---|
-| Backend | Java, Spring Boot, Spring Data JPA |
-| Database | PostgreSQL |
-| Caching | Redis (Upstash) |
-| Rate Limiting | Bucket4j |
-| Deployment | Docker, Render |
+## 🛠️ Tech Stack
 
-## API Reference
+### Backend
+- Java 21
+- Spring Boot 3
+- Spring Security
+- Spring Data JPA
+- Hibernate
 
-### Shorten a URL
-```http
-POST /shorten
-Content-Type: application/json
+### Database
+- PostgreSQL
 
-{
-  "longUrl": "https://example.com/some/very/long/path"
-}
-```
+### Cache
+- Redis
 
-**Response:**
-```json
-{
-  "shortUrl": "https://url-shortener-9iuz.onrender.com/q0U",
-  "longUrl": "https://example.com/some/very/long/path"
-}
-```
+### Authentication
+- JWT (JSON Web Token)
+- BCrypt Password Encoder
 
-### Redirect
-```http
-GET /{code}
-```
-Redirects to the original long URL. Cached in Redis for fast repeated access.
+### API Documentation
+- Swagger / OpenAPI
 
-### Health Check
-```http
-GET /ping
-```
-Returns `pong`.
+### Build Tool
+- Maven
 
-## Architecture
+### Deployment
+- Docker
+- Render
+
+---
+
+## 🏗️ System Architecture
 
 ```
-Client → Spring Boot Controller → Rate Limiter (Bucket4j)
-                                        ↓
-                              Redis Cache (check first)
-                                        ↓ (cache miss)
-                              PostgreSQL (persistent store)
+                 +--------------------+
+                 |      Client        |
+                 |  (Browser / User)  |
+                 +---------+----------+
+                           |
+                           | HTTP Requests
+                           |
+                 +---------v----------+
+                 | Spring Boot REST API|
+                 +---------+----------+
+                           |
+         +-----------------+------------------+
+         |                                    |
+         |                                    |
++--------v--------+                 +---------v---------+
+| PostgreSQL DB   |                 | Redis Cache       |
+| URL & User Data |                 | Cached Redirects  |
++-----------------+                 +-------------------+
 ```
 
-- New short URLs are generated using an auto-incrementing ID converted to Base62, producing compact, collision-free codes.
-- On redirect, the cache is checked before the database — a cache hit skips the DB lookup entirely.
-- Rate limiting is applied per request to prevent abuse.
+---
 
-## Running Locally
+## 📂 Project Structure
 
-### Prerequisites
-- Java 21+
-- Maven 3.9+
-- PostgreSQL (running locally)
-- Redis (running locally)
+```
+src
+├── controller
+├── service
+├── repository
+├── model
+├── dto
+├── security
+├── config
+├── exception
+└── resources
+```
 
-### Setup
+---
 
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/MADHURI-HS/url-shortener.git
-   cd url-shortener
-   ```
+## 🔐 Authentication Flow
 
-2. Create a local database in PostgreSQL named `urlshortener`.
+1. User registers an account.
+2. User logs in using email and password.
+3. JWT token is generated upon successful login.
+4. Client stores the JWT.
+5. JWT is sent in the Authorization header for protected APIs.
+6. Spring Security validates the token before processing requests.
 
-3. Set the required environment variable for your local DB password:
-   ```bash
-   export LOCAL_DB_PASSWORD=your_postgres_password
-   ```
+---
 
-4. Run the application:
-   ```bash
-   ./mvnw spring-boot:run
-   ```
+## 📦 REST API Endpoints
 
-   This uses the `local` Spring profile by default, connecting to PostgreSQL and Redis on `localhost`.
+### Authentication APIs
 
-5. Test it:
-   ```bash
-   curl http://localhost:8080/ping
-   ```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/register` | Register a new user |
+| POST | `/auth/login` | Login and receive JWT |
 
-## Deployment
+### URL APIs
 
-This project is deployed on [Render](https://render.com) using Docker, with:
-- **PostgreSQL** — managed instance on Render
-- **Redis** — managed instance on [Upstash](https://upstash.com)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/shorten` | Create a shortened URL |
+| GET | `/api/urls` | Retrieve all URLs of the logged-in user |
+| DELETE | `/api/urls/{shortCode}` | Delete a shortened URL |
+| GET | `/{shortCode}` | Redirect to original URL |
 
-Configuration is handled entirely through environment variables (`SPRING_PROFILES_ACTIVE=prod`), keeping all credentials out of source control.
+---
 
-## License
+## ⚡ Redis Caching
 
-This project is open source and available for learning and reference purposes.
+Redis is used to cache frequently accessed URLs, significantly reducing database lookups and improving redirect performance.
+
+---
+
+## 🚦 Rate Limiting
+
+Bucket4j is implemented to protect the application from abuse by limiting the number of requests a client can make within a specified time window.
+
+---
+
+## 🐳 Running the Application with Docker
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/MADHURI-HS/url-shortener.git
+
+cd url-shortener
+```
+
+### Start the Application
+
+```bash
+docker compose up --build
+```
+
+Application:
+
+```
+http://localhost:8080
+```
+
+---
+
+## ⚙️ Running Without Docker
+
+### Start PostgreSQL
+
+### Start Redis
+
+### Configure Environment Variables
+
+```properties
+SPRING_DATASOURCE_URL=
+SPRING_DATASOURCE_USERNAME=
+SPRING_DATASOURCE_PASSWORD=
+
+REDIS_HOST=
+REDIS_PORT=
+
+JWT_SECRET=
+```
+
+Run:
+
+```bash
+./mvnw spring-boot:run
+```
+
+---
+
+## ☁️ Deployment
+
+The application is deployed on **Render** using:
+
+- Docker
+- Render Web Service
+- Render PostgreSQL
+- Render Key Value (Redis)
+
+Live URL:
+
+https://url-shortener-app-n9px.onrender.com
+
+---
+
+## 📖 API Documentation
+
+Swagger UI
+
+Local
+
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+Production
+
+```
+https://url-shortener-app-n9px.onrender.com/swagger-ui/index.html
+```
+
+---
+
+## 📸 Screenshots
+
+> Add screenshots after capturing them.
+
+```
+screenshots/
+├── home.png
+├── login.png
+├── register.png
+├── dashboard.png
+├── shorten-url.png
+└── swagger.png
+```
+
+Example
+
+```markdown
+## Home Page
+
+![Home](screenshots/home.png)
+
+## Dashboard
+
+![Dashboard](screenshots/dashboard.png)
+```
+
+---
+
+## 🚀 Future Enhancements
+
+- Custom Short URLs
+- QR Code Generation
+- URL Click Analytics
+- URL Expiration
+- Password Protected URLs
+- Email Verification
+- Admin Dashboard
+- User Profile Management
+
+---
+
+## 👨‍💻 Skills Demonstrated
+
+- REST API Development
+- Authentication & Authorization
+- Spring Security
+- JWT
+- Spring Data JPA
+- PostgreSQL
+- Redis Caching
+- Rate Limiting
+- Docker
+- Cloud Deployment
+- API Documentation
+- Production Configuration
+
+---
+
+## 👩‍💻 Author
+
+**Madhuri H S**
+
+GitHub:
+https://github.com/MADHURI-HS
+
+LinkedIn:
+https://www.linkedin.com/in/madhuri-h-s/
+
+---
+
+⭐ If you found this project helpful, consider giving it a star!
