@@ -168,3 +168,9 @@ Configuration is handled entirely through environment variables (`SPRING_PROFILE
 ## License
 
 This project is open source and available for learning and reference purposes.
+
+## Future Enhancements
+While this architecture works perfectly for a single-instance deployment, scaling it horizontally would require a few adjustments:
+- **Distributed ID Generation:** Replacing the in-memory `AtomicLong` counter with a distributed approach (like Snowflake ID or Redis atomic counters) to prevent collisions across multiple instances.
+- **Monitoring:** Integrating Prometheus and Grafana for real-time metrics on cache hit rates and API latency.
+- **Centralized Cache Eviction:** Implementing a webhook or messaging queue (RabbitMQ) to ensure cache consistency if the database is updated outside of the application layer.
