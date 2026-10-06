@@ -28,7 +28,7 @@ A Spring Boot URL shortening service with JWT-based user authentication, Redis-b
 |-------------------|----------------------------------------------|
 | Backend           | Java 21, Spring Boot 3.5, Spring Web         |
 | Security          | Spring Security, JWT (jjwt 0.12.7), BCrypt   |
-| Database          | PostgreSQL, Spring Data JPA                  |
+| Database          | MySQL, Spring Data JPA                  |
 | Caching           | Redis (Spring Cache abstraction)             |
 | Rate Limiting     | Bucket4j (token bucket, in-memory per IP)    |
 | API Docs          | springdoc-openapi (Swagger UI)               |
