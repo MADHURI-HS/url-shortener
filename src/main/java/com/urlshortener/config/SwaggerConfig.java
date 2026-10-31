@@ -29,7 +29,7 @@ public class SwaggerConfig {
                                     • Role-Based Authorization
                                     • Redis Caching
                                     • Bucket4j Rate Limiting
-                                    • PostgreSQL
+                                    • MySQL
                                     • Swagger Documentation
                                     """)
                 )

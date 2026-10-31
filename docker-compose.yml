@@ -1,20 +1,25 @@
 services:
 
-  postgres:
-    image: postgres:16
-    container_name: url-shortener-postgres
+  mysql:
+    image: mysql:8.4
+    container_name: url-shortener-mysql
     restart: unless-stopped
 
     environment:
-      POSTGRES_DB: urlshortener
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      MYSQL_DATABASE: urlshortener
+      MYSQL_ROOT_PASSWORD: root
 
     ports:
-      - "5432:5432"
+      - "3306:3306"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   redis:
     image: redis:7-alpine
@@ -33,8 +38,10 @@ services:
     restart: unless-stopped
 
     depends_on:
-      - postgres
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
     ports:
       - "8080:8080"
@@ -42,15 +49,18 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
 
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/urlshortener
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/urlshortener?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
       APP_BASE_URL: http://localhost:8080
 
+      # development-only value
+      JWT_SECRET: docker-dev-only-secret-change-me-0123456789-abcdef
+
 volumes:
-  postgres_data:
+  mysql_data:
   redis_data:

@@ -18,7 +18,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @Tag(
         name = "URL Management",
@@ -52,17 +51,14 @@ public class UrlController {
             HttpServletRequest httpRequest,
             @AuthenticationPrincipal User user) {
 
-        String clientIp = httpRequest.getHeader("X-Forwarded-For");
-
-        if (clientIp == null || clientIp.isBlank()) {
-            clientIp = httpRequest.getRemoteAddr();
-        }
+        String clientIp = resolveClientIp(httpRequest);
 
         if (!rateLimiterService.tryConsume(clientIp)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of(
-                            "error",
-                            "Too many requests. Try again in 1 minute."
+                    .body(new ApiResponse<Void>(
+                            false,
+                            "Too many requests. Try again in 1 minute.",
+                            null
                     ));
         }
 
@@ -119,5 +115,19 @@ public class UrlController {
                         null
                 )
         );
+    }
+
+    /**
+     * Behind a proxy (Render) X-Forwarded-For can be a list: "client, proxy1, proxy2".
+     * The first entry is the original client.
+     */
+    private static String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+
+        return request.getRemoteAddr();
     }
 }

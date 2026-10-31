@@ -48,6 +48,15 @@ public class GlobalExceptionHandler {
                 );
     }
 
+    @ExceptionHandler(UrlNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUrlNotFound(
+            UrlNotFoundException ex) {
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(false, ex.getMessage(), null));
+    }
+
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidCredentials(
             InvalidCredentialsException ex) {
