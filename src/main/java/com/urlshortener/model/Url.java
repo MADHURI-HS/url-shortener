@@ -11,7 +11,7 @@ public class Url {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "short_code", unique = true, nullable = false)
+    @Column(name = "short_code", unique = true, nullable = false, length = 32)
     private String shortCode;
 
     @Column(name = "long_url", nullable = false, length = 2048)
@@ -60,5 +60,4 @@ public class Url {
         return createdAt;
     }
 
-    // Getters & Setters
 }

@@ -1,3 +1,20 @@
+// Escape text before putting it into innerHTML (stops stored XSS via the long URL).
+function esc(value) {
+    return String(value).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+}
+
+// Token missing/expired (tokens last 15 minutes): go back to the login page.
+function handleUnauthorized(response) {
+    if (response.status === 401) {
+        localStorage.removeItem("jwt");
+        window.location.href = "/login.html";
+        return true;
+    }
+    return false;
+}
+
 window.onload = function () {
 
     const token = localStorage.getItem("jwt");
@@ -26,6 +43,10 @@ async function loadUrls() {
 
         });
 
+        if (handleUnauthorized(response)) {
+            return;
+        }
+
         const result = await response.json();
 
         if (!response.ok) {
@@ -48,19 +69,19 @@ async function loadUrls() {
 
                        <strong>Short URL:</strong><br>
 
-                       <a href="${window.location.origin}/${url.shortCode}" target="_blank">
-                           ${window.location.origin}/${url.shortCode}
+                       <a href="${esc(window.location.origin)}/${esc(url.shortCode)}" target="_blank" rel="noopener noreferrer">
+                           ${esc(window.location.origin)}/${esc(url.shortCode)}
                        </a>
 
                        <br><br>
 
                        <strong>Original URL:</strong><br>
 
-                       <small>${url.longUrl}</small>
+                       <small>${esc(url.longUrl)}</small>
 
                        <br><br>
 
-                       <button onclick="deleteUrl('${url.shortCode}')">
+                       <button onclick="deleteUrl('${esc(url.shortCode)}')">
                            Delete
                        </button>
 
@@ -116,6 +137,10 @@ async function shortenUrl() {
 
         });
 
+        if (handleUnauthorized(response)) {
+            return;
+        }
+
         const data = await response.json();
 
         if (response.ok) {
@@ -126,8 +151,8 @@ async function shortenUrl() {
             shortResult.innerHTML = `
                 <p>
                     <strong>Short URL:</strong>
-                    <a href="${data.data.shortUrl}" target="_blank">
-                        ${data.data.shortUrl}
+                    <a href="${esc(data.data.shortUrl)}" target="_blank" rel="noopener noreferrer">
+                        ${esc(data.data.shortUrl)}
                     </a>
                 </p>
             `;
@@ -177,6 +202,10 @@ async function deleteUrl(shortCode) {
             }
 
         });
+
+        if (handleUnauthorized(response)) {
+            return;
+        }
 
         const result = await response.json();
 

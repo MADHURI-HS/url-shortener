@@ -42,7 +42,7 @@ class AuthControllerTest {
     void register_returns200OnSuccess() throws Exception {
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Jane\",\"email\":\"jane@example.com\",\"password\":\"secret\"}"))
+                        .content("{\"name\":\"Jane\",\"email\":\"jane@example.com\",\"password\":\"secret123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
@@ -64,7 +64,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Jane\",\"email\":\"jane@example.com\",\"password\":\"secret\"}"))
+                        .content("{\"name\":\"Jane\",\"email\":\"jane@example.com\",\"password\":\"secret123\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Email is already registered"));
     }
@@ -75,7 +75,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"jane@example.com\",\"password\":\"secret\"}"))
+                        .content("{\"email\":\"jane@example.com\",\"password\":\"secret123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").value("jwt-token"));
     }
@@ -99,5 +99,14 @@ class AuthControllerTest {
                         .content("{\"email\":\"\",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void register_returns400ForTooShortPassword() throws Exception {
+        mockMvc.perform(post("/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Jane\",\"email\":\"jane@example.com\",\"password\":\"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.password").value("Password must be between 8 and 72 characters"));
     }
 }

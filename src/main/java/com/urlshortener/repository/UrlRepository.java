@@ -11,8 +11,6 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
 
     Optional<Url> findByShortCode(String shortCode);
 
-    Optional<Url> findTopByOrderByIdDesc();
-
     Optional<Url> findByLongUrlAndUser(String longUrl, User user);
 
     Optional<Url> findByShortCodeAndUser(String shortCode, User user);

@@ -22,11 +22,10 @@ public class SwaggerConfig {
                                 .title("URL Shortener REST API")
                                 .version("1.0")
                                 .description("""
-                                    A production-ready URL Shortener built with Spring Boot.
+                                    A URL shortener built with Spring Boot.
 
                                     Features:
                                     • JWT Authentication
-                                    • Role-Based Authorization
                                     • Redis Caching
                                     • Bucket4j Rate Limiting
                                     • MySQL

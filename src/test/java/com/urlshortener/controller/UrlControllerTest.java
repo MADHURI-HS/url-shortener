@@ -121,4 +121,17 @@ class UrlControllerTest {
 
         verify(rateLimiterService).tryConsume("203.0.113.7");
     }
+
+    @Test
+    void shorten_prefersCloudflareHeaderOverForwardedFor() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("CF-Connecting-IP", "198.51.100.9");
+        request.addHeader("X-Forwarded-For", "6.6.6.6, 10.0.0.1");
+        when(rateLimiterService.tryConsume("198.51.100.9")).thenReturn(true);
+        when(urlService.shortenUrl(any(), any())).thenReturn("abc");
+
+        controller.shortenUrl(body("https://example.com"), request, user);
+
+        verify(rateLimiterService).tryConsume("198.51.100.9");
+    }
 }

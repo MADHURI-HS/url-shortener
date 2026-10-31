@@ -118,10 +118,18 @@ public class UrlController {
     }
 
     /**
-     * Behind a proxy (Render) X-Forwarded-For can be a list: "client, proxy1, proxy2".
-     * The first entry is the original client.
+     * Client IP used for rate limiting.
+     * Render sits behind Cloudflare, which sets CF-Connecting-IP itself, so a client cannot fake it.
+     * X-Forwarded-For is only a fallback: proxies append to it and a client can send its own value,
+     * so its first entry can be spoofed (e.g. when running without Cloudflare).
      */
     private static String resolveClientIp(HttpServletRequest request) {
+        String cloudflareIp = request.getHeader("CF-Connecting-IP");
+
+        if (cloudflareIp != null && !cloudflareIp.isBlank()) {
+            return cloudflareIp.trim();
+        }
+
         String forwarded = request.getHeader("X-Forwarded-For");
 
         if (forwarded != null && !forwarded.isBlank()) {

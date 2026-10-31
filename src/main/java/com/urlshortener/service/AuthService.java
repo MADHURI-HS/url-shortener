@@ -8,7 +8,6 @@ import com.urlshortener.model.User;
 import com.urlshortener.repository.UserRepository;
 import com.urlshortener.security.JwtService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.urlshortener.exception.InvalidCredentialsException;
 import org.springframework.stereotype.Service;
@@ -40,7 +39,7 @@ public class AuthService {
                 passwordEncoder.encode(request.getPassword())
         );
 
-        user.setRole("ROLE_USER");   // ✅ This is the important line
+        user.setRole("ROLE_USER");
 
         userRepository.save(user);
     }

@@ -15,10 +15,11 @@ A Spring Boot URL shortening service with JWT-based user authentication, Redis-b
 - **URL shortening** — converts long URLs into short, unique codes using Base62 encoding of an auto-incrementing counter
 - **Duplicate handling** — re-shortening a URL a user has already shortened returns the existing short code instead of creating a new one
 - **Fast redirects** — Redis-backed caching (`@Cacheable`/`@CacheEvict`) sits in front of MySQL for short-code lookups, so repeated redirects skip the database
-- **Rate limiting** — Bucket4j token-bucket algorithm limits each client IP to 5 shorten requests per minute (resolved via `X-Forwarded-For`, falling back to remote address)
+- **Rate limiting** — Bucket4j token-bucket algorithm limits each client IP to 5 shorten requests per minute (client IP from `CF-Connecting-IP` when behind Cloudflare/Render, falling back to `X-Forwarded-For`, then the remote address)
 - **Centralized error handling** — a `@RestControllerAdvice` global exception handler returns consistent JSON responses for validation errors, duplicate registrations, and invalid credentials
 - **API documentation** — interactive Swagger UI via springdoc-openapi
 - **Web dashboard** — static login, register, and dashboard pages for creating and managing short URLs from the browser
+- **Automated tests** — JUnit 5 and Mockito unit tests for services and controllers, MockMvc tests for HTTP behavior, a Spring Cache test, and an end-to-end flow test on in-memory H2 (no MySQL or Redis needed to run `./mvnw test`)
 - **Environment-based configuration** — separate Spring Profiles (`local`, `docker`, `prod`) for database, Redis, and base-URL settings
 - **Containerized deployment** — multi-stage Dockerfile, Docker Compose for local MySQL/Redis, deployed on Render with Redis hosted on Upstash
 
@@ -34,6 +35,7 @@ A Spring Boot URL shortening service with JWT-based user authentication, Redis-b
 | API Docs          | springdoc-openapi (Swagger UI)               |
 | Frontend          | HTML, CSS, vanilla JavaScript                |
 | Deployment        | Docker, Docker Compose, Render, Upstash      |
+| Testing           | JUnit 5, Mockito, Spring Boot Test, MockMvc, H2 |
 | Boilerplate       | Lombok                                       |
 
 ## API Reference
@@ -111,7 +113,8 @@ Client → Spring Security filter chain (JWT auth filter)
           MySQL (persistent store, Spring Data JPA)
 ```
 
-- Short codes are generated from an in-memory `AtomicLong` counter (initialized from the highest existing URL ID) converted to Base62.
+- Short codes are Base62 of `100000 + the row's database id`. The database assigns the id, so codes stay unique across restarts and multiple instances.
+- `schema-mysql.sql` makes `short_code` and `long_url` case-sensitive (binary collation). MySQL's default collation is case-insensitive, which would make `q1a` and `q1A` collide and treat URL paths that differ only in case as the same URL.
 - `JwtAuthenticationFilter` runs once per request, validates the bearer token, and populates the Spring Security context so `@AuthenticationPrincipal` resolves the current user in controllers.
 - Public endpoints (`/`, static pages, `/auth/**`, Swagger, and all `GET` requests for redirects) bypass authentication; `/api/**` requires a valid JWT.
 
@@ -120,8 +123,7 @@ Client → Spring Security filter chain (JWT auth filter)
 ### Prerequisites
 - Java 21+
 - Maven 3.9+
-- MySQL 8 (running locally) and Redis - the easiest way is `docker compose up -d mysql redis`
-- Redis (running locally)
+- MySQL 8 and Redis running locally - the easiest way is `docker compose up -d mysql redis`
 
 ### Setup
 
@@ -135,8 +137,9 @@ cd url-shortener
 
 3. Set required environment variables:
 ```
-export LOCAL_DB_PASSWORD=your_postgres_password
-export JWT_SECRET=your_jwt_signing_secret
+# both are optional locally (defaults: root / a development-only secret)
+export LOCAL_DB_PASSWORD=your_mysql_password
+export JWT_SECRET=a_random_secret_of_at_least_32_characters
 ```
 
 4. Run the application:
@@ -172,12 +175,19 @@ Deployed on [Render](https://render.com) using the multi-stage Dockerfile, with:
 
 Configuration is handled entirely through environment variables (`SPRING_PROFILES_ACTIVE=prod`), keeping credentials out of source control.
 
+## Known Limitations
+
+- Rate-limit buckets live in memory per instance (not shared across instances) and are never evicted.
+- The tests run on in-memory H2, not MySQL; MySQL-specific behavior (such as collation) is covered by `schema-mysql.sql` but not by automated tests. Testcontainers would close that gap.
+- JWTs are kept in `localStorage` (readable by any script on the page) and tokens cannot be revoked before they expire (15 minutes).
+- `spring.jpa.hibernate.ddl-auto=update` is convenient but a migration tool such as Flyway is the production-grade choice.
+- `JWT_SECRET` must be at least 32 characters (256 bits), otherwise token signing fails.
+
 ## License
 
 This project is open source and available for learning and reference purposes.
 
 ## Future Enhancements
 While this architecture works perfectly for a single-instance deployment, scaling it horizontally would require a few adjustments:
-- **Distributed ID Generation:** Replacing the in-memory `AtomicLong` counter with a distributed approach (like Snowflake ID or Redis atomic counters) to prevent collisions across multiple instances.
 - **Monitoring:** Integrating Prometheus and Grafana for real-time metrics on cache hit rates and API latency.
 - **Centralized Cache Eviction:** Implementing a webhook or messaging queue (RabbitMQ) to ensure cache consistency if the database is updated outside of the application layer.

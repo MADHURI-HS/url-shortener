@@ -10,12 +10,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,6 +29,9 @@ class UrlServiceTest {
     @Mock
     private UrlRepository urlRepository;
 
+    @InjectMocks
+    private UrlService service;
+
     private User user;
 
     @BeforeEach
@@ -36,21 +41,33 @@ class UrlServiceTest {
                 .password("hash").role("ROLE_USER").build();
     }
 
-    /** The service reads the last id in its constructor, so stub that first. */
-    private UrlService newService(Optional<Url> lastUrl) {
-        when(urlRepository.findTopByOrderByIdDesc()).thenReturn(lastUrl);
-        return new UrlService(urlRepository);
+    /** Simulates the database: saveAndFlush assigns an auto-increment id (starting at firstId). */
+    private void databaseAssignsIdsFrom(long firstId) {
+        AtomicLong nextId = new AtomicLong(firstId);
+        when(urlRepository.saveAndFlush(any(Url.class))).thenAnswer(invocation -> {
+            Url url = invocation.getArgument(0);
+            ReflectionTestUtils.setField(url, "id", nextId.getAndIncrement());
+            return url;
+        });
     }
 
     @Test
-    void shortenUrl_createsNewCodeStartingAt100000() {
-        UrlService service = newService(Optional.empty());
+    void shortenUrl_buildsCodeFromDatabaseIdPlusOffset() {
+        databaseAssignsIdsFrom(7L);
         when(urlRepository.findByLongUrlAndUser("https://example.com", user))
                 .thenReturn(Optional.empty());
 
         String code = service.shortenUrl("https://example.com", user);
 
-        assertEquals(Base62Encoder.encode(100_000L), code);
+        assertEquals(Base62Encoder.encode(UrlService.CODE_OFFSET + 7L), code);
+    }
+
+    @Test
+    void shortenUrl_savesLongUrlAndOwnerAndFinalCode() {
+        databaseAssignsIdsFrom(1L);
+        when(urlRepository.findByLongUrlAndUser(any(), any())).thenReturn(Optional.empty());
+
+        String code = service.shortenUrl("https://example.com", user);
 
         ArgumentCaptor<Url> saved = ArgumentCaptor.forClass(Url.class);
         verify(urlRepository).save(saved.capture());
@@ -60,30 +77,20 @@ class UrlServiceTest {
     }
 
     @Test
-    void shortenUrl_incrementsCounterForEachNewUrl() {
-        UrlService service = newService(Optional.empty());
+    void shortenUrl_differentUrlsGetDifferentCodes() {
+        databaseAssignsIdsFrom(1L);
         when(urlRepository.findByLongUrlAndUser(any(), any())).thenReturn(Optional.empty());
 
         String first = service.shortenUrl("https://a.com", user);
         String second = service.shortenUrl("https://b.com", user);
 
-        assertEquals(Base62Encoder.encode(100_000L), first);
-        assertEquals(Base62Encoder.encode(100_001L), second);
-    }
-
-    @Test
-    void shortenUrl_continuesFromLastDatabaseId() {
-        Url last = new Url();
-        ReflectionTestUtils.setField(last, "id", 500L);
-        UrlService service = newService(Optional.of(last));
-        when(urlRepository.findByLongUrlAndUser(any(), any())).thenReturn(Optional.empty());
-
-        assertEquals(Base62Encoder.encode(501L), service.shortenUrl("https://a.com", user));
+        assertEquals(Base62Encoder.encode(UrlService.CODE_OFFSET + 1L), first);
+        assertEquals(Base62Encoder.encode(UrlService.CODE_OFFSET + 2L), second);
+        assertNotEquals(first, second);
     }
 
     @Test
     void shortenUrl_returnsExistingCodeForDuplicateUrl() {
-        UrlService service = newService(Optional.empty());
         Url existing = new Url();
         existing.setShortCode("abc");
         existing.setLongUrl("https://example.com");
@@ -91,12 +98,12 @@ class UrlServiceTest {
                 .thenReturn(Optional.of(existing));
 
         assertEquals("abc", service.shortenUrl("https://example.com", user));
+        verify(urlRepository, never()).saveAndFlush(any());
         verify(urlRepository, never()).save(any());
     }
 
     @Test
     void getLongUrl_returnsStoredUrl() {
-        UrlService service = newService(Optional.empty());
         Url url = new Url();
         url.setShortCode("abc");
         url.setLongUrl("https://example.com");
@@ -107,7 +114,6 @@ class UrlServiceTest {
 
     @Test
     void getLongUrl_returnsNullWhenCodeUnknown() {
-        UrlService service = newService(Optional.empty());
         when(urlRepository.findByShortCode("nope")).thenReturn(Optional.empty());
 
         assertNull(service.getLongUrl("nope"));
@@ -115,7 +121,6 @@ class UrlServiceTest {
 
     @Test
     void getUrlsByUser_mapsEntitiesToResponses() {
-        UrlService service = newService(Optional.empty());
         Url url = new Url();
         url.setShortCode("abc");
         url.setLongUrl("https://example.com");
@@ -130,7 +135,6 @@ class UrlServiceTest {
 
     @Test
     void deleteUserUrl_deletesOwnedUrl() {
-        UrlService service = newService(Optional.empty());
         Url url = new Url();
         url.setShortCode("abc");
         when(urlRepository.findByShortCodeAndUser("abc", user)).thenReturn(Optional.of(url));
@@ -142,7 +146,6 @@ class UrlServiceTest {
 
     @Test
     void deleteUserUrl_throwsWhenUrlNotOwnedOrMissing() {
-        UrlService service = newService(Optional.empty());
         when(urlRepository.findByShortCodeAndUser("abc", user)).thenReturn(Optional.empty());
 
         assertThrows(UrlNotFoundException.class, () -> service.deleteUserUrl("abc", user));
