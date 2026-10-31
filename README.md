@@ -19,6 +19,7 @@ A Spring Boot URL shortening service with JWT-based user authentication, Redis-b
 - **Centralized error handling** — a `@RestControllerAdvice` global exception handler returns consistent JSON responses for validation errors, duplicate registrations, and invalid credentials
 - **API documentation** — interactive Swagger UI via springdoc-openapi
 - **Web dashboard** — static login, register, and dashboard pages for creating and managing short URLs from the browser
+- **Automated tests** — JUnit 5 and Mockito unit tests for services and controllers, MockMvc tests for HTTP behavior, a Spring Cache test, and an end-to-end flow test on in-memory H2 (no MySQL or Redis needed to run `./mvnw test`)
 - **Environment-based configuration** — separate Spring Profiles (`local`, `docker`, `prod`) for database, Redis, and base-URL settings
 - **Containerized deployment** — multi-stage Dockerfile, Docker Compose for local MySQL/Redis, deployed on Render with Redis hosted on Upstash
 
@@ -34,6 +35,7 @@ A Spring Boot URL shortening service with JWT-based user authentication, Redis-b
 | API Docs          | springdoc-openapi (Swagger UI)               |
 | Frontend          | HTML, CSS, vanilla JavaScript                |
 | Deployment        | Docker, Docker Compose, Render, Upstash      |
+| Testing           | JUnit 5, Mockito, Spring Boot Test, MockMvc, H2 |
 | Boilerplate       | Lombok                                       |
 
 ## API Reference
