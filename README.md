@@ -182,6 +182,10 @@ No secrets are committed. Production values come from environment variables only
 
 > Tests run on H2, not MySQL, so MySQL-specific behavior (such as the collation described above) is verified manually. Testcontainers would be the next step.
 
+### Performance
+
+Measured locally with `curl` (50 requests after a warm-up, MySQL and Redis in Docker on the same laptop): the median redirect took about **3.0 ms with the Redis cache** and about **4.5 ms without it** (`--spring.cache.type=none`), roughly a third faster. With a remote database the gap would be larger; these numbers are a local benchmark, not a production claim.
+
 ## Deployment
 
 The demo is deployed on **Render** using the multi-stage `Dockerfile`:
