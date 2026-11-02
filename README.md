@@ -1,193 +1,252 @@
 # URL Shortener
 
-A Spring Boot URL shortening service with JWT-based user authentication, Redis-backed caching, MySQL persistence, and per-client rate limiting. Each user registers/logs in and manages their own shortened URLs through a REST API and a simple web dashboard.
+A URL shortening service built with **Java 21, Spring Boot 3, MySQL and Redis**. Users register, log in with JWT authentication, create short links, list their own links and delete them. Redirects are served from a Redis cache, and link creation is rate limited per IP.
 
-**🔗 Live demo:** https://url-shortener-app-n9px.onrender.com
+**Live demo:** https://url-shortener-app-n9px.onrender.com  
+**API docs (Swagger UI):** https://url-shortener-app-n9px.onrender.com/swagger-ui.html
 
-> Free-tier hosting note: the server spins down after periods of inactivity. The first request after idle time may take 30–50 seconds to respond while it wakes up.
+> ### ⏳ About the live demo (please read)
+> The demo runs entirely on **free-tier hosting** (Render web service, free managed Redis and a free hosted MySQL). Free services are put to sleep after about 15 minutes without traffic.
+>
+> - **The first request after a pause can take 30–90 seconds** while the service wakes up, the JVM starts and the database and Redis connections are re-established. The page may look blank or stuck during this time. Please wait and refresh once.
+> - After the service is awake, requests are fast again until it goes idle.
+> - Free Redis and MySQL tiers also have limited memory, connections and storage, so heavy use may be slow or refused.
+> - This is a limitation of the free plans, not of the application. Running the project locally with Docker (see below) starts in a few seconds.
+
+---
+
+## Table of Contents
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [API Reference](#api-reference)
+- [Running Locally](#running-locally)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Design Decisions](#design-decisions)
+- [Known Limitations](#known-limitations)
+- [Future Enhancements](#future-enhancements)
+- [Project Structure](#project-structure)
 
 ---
 
 ## Features
 
-- **User authentication** — registration and login secured with Spring Security, BCrypt password hashing, and stateless JWT sessions (`jjwt`, 15-minute token expiry)
-- **Per-user URL ownership** — shortened URLs are tied to the authenticated user; users can list and delete only their own URLs
-- **URL shortening** — converts long URLs into short, unique codes using Base62 encoding of an auto-incrementing counter
-- **Duplicate handling** — re-shortening a URL a user has already shortened returns the existing short code instead of creating a new one
-- **Fast redirects** — Redis-backed caching (`@Cacheable`/`@CacheEvict`) sits in front of MySQL for short-code lookups, so repeated redirects skip the database
-- **Rate limiting** — Bucket4j token-bucket algorithm limits each client IP to 5 shorten requests per minute (client IP from `CF-Connecting-IP` when behind Cloudflare/Render, falling back to `X-Forwarded-For`, then the remote address)
-- **Centralized error handling** — a `@RestControllerAdvice` global exception handler returns consistent JSON responses for validation errors, duplicate registrations, and invalid credentials
-- **API documentation** — interactive Swagger UI via springdoc-openapi
-- **Web dashboard** — static login, register, and dashboard pages for creating and managing short URLs from the browser
-- **Automated tests** — JUnit 5 and Mockito unit tests for services and controllers, MockMvc tests for HTTP behavior, a Spring Cache test, and an end-to-end flow test on in-memory H2 (no MySQL or Redis needed to run `./mvnw test`)
-- **Environment-based configuration** — separate Spring Profiles (`local`, `docker`, `prod`) for database, Redis, and base-URL settings
-- **Containerized deployment** — multi-stage Dockerfile, Docker Compose for local MySQL/Redis, deployed on Render with Redis hosted on Upstash
+- **JWT authentication.** Register and log in; tokens expire after 15 minutes and are validated on every request by a custom Spring Security filter. Passwords are hashed with BCrypt.
+- **Per-user URL management.** Users can only list and delete their own links.
+- **Base62 short codes.** Each code is generated from the row's database id, so codes are unique across restarts and across multiple instances.
+- **Redis caching.** Redirect lookups are cached for 24 hours. A deleted link is evicted from the cache immediately, and "not found" results are never cached.
+- **Rate limiting.** Bucket4j allows 5 shorten requests per minute per client IP and responds with HTTP 429 beyond that.
+- **Input validation.** URLs must start with `http://` or `https://` and be at most 2048 characters. Passwords must be 8–72 characters. Validation errors return field-level messages.
+- **Consistent API responses.** Every endpoint returns `{ "success", "message", "data" }`, with meaningful status codes (400, 401, 404, 409, 429).
+- **Swagger / OpenAPI** documentation with a Bearer-token "Authorize" button.
+- **Simple web UI.** Register, log in, shorten URLs and manage them from a dashboard. User-provided text is HTML-escaped to prevent XSS.
+- **Containerized.** Multi-stage Dockerfile and a Docker Compose file for MySQL, Redis and the app.
 
 ## Tech Stack
 
-| Layer            | Technology                                  |
-|-------------------|----------------------------------------------|
-| Backend           | Java 21, Spring Boot 3.5, Spring Web         |
-| Security          | Spring Security, JWT (jjwt 0.12.7), BCrypt   |
-| Database          | MySQL 8, Spring Data JPA (H2 for tests)      |
-| Caching           | Redis (Spring Cache abstraction)             |
-| Rate Limiting     | Bucket4j (token bucket, in-memory per IP)    |
-| API Docs          | springdoc-openapi (Swagger UI)               |
-| Frontend          | HTML, CSS, vanilla JavaScript                |
-| Deployment        | Docker, Docker Compose, Render, Upstash      |
-| Testing           | JUnit 5, Mockito, Spring Boot Test, MockMvc, H2 |
-| Boilerplate       | Lombok                                       |
-
-## API Reference
-
-### Auth
-
-**Register**
-```
-POST /auth/register
-Content-Type: application/json
-
-{ "name": "Jane Doe", "email": "jane@example.com", "password": "secret" }
-```
-
-**Login** — returns a JWT
-```
-POST /auth/login
-Content-Type: application/json
-
-{ "email": "jane@example.com", "password": "secret" }
-```
-
-### URLs (require `Authorization: Bearer <token>`)
-
-**Shorten a URL**
-```
-POST /api/shorten
-Content-Type: application/json
-
-{ "longUrl": "https://example.com/some/very/long/path" }
-```
-Response:
-```
-{
-  "success": true,
-  "message": "Short URL created successfully",
-  "data": {
-    "shortUrl": "https://url-shortener-app-n9px.onrender.com/q0U",
-    "longUrl": "https://example.com/some/very/long/path"
-  }
-}
-```
-Rate limited to 5 requests/minute per client IP; exceeding the limit returns `429 Too Many Requests`.
-
-**Get my URLs**
-```
-GET /api/urls
-```
-
-**Delete a URL**
-```
-DELETE /api/urls/{shortCode}
-```
-
-### Redirect (public)
-```
-GET /{code}
-```
-Redirects (`302 Found`) to the original long URL. Lookup is cached in Redis; a cache miss falls through to MySQL.
-
-### API Docs
-```
-GET /swagger-ui.html
-```
+| Layer | Technology |
+|---|---|
+| Language / runtime | Java 21 |
+| Framework | Spring Boot 3.5 (Web, Validation, Data JPA, Cache, Security) |
+| Database | MySQL 8 with Spring Data JPA / Hibernate |
+| Cache | Redis (Spring Cache + Spring Data Redis, Lettuce) |
+| Authentication | Spring Security, JWT (jjwt 0.12), BCrypt |
+| Rate limiting | Bucket4j 7.6 |
+| API docs | springdoc-openapi (Swagger UI) |
+| Testing | JUnit 5, Mockito, Spring Boot Test, MockMvc, H2 (tests only) |
+| Build / packaging | Maven (wrapper included), Docker, Docker Compose |
+| Hosting (demo) | Render (free tier), hosted MySQL, hosted Redis |
 
 ## Architecture
 
 ```
-Client → Spring Security filter chain (JWT auth filter)
-                    ↓
-        Spring Boot Controller → Rate Limiter (Bucket4j, /api/shorten only)
-                    ↓
-          Redis Cache (checked first on redirect)
-                    ↓ (cache miss)
-          MySQL (persistent store, Spring Data JPA)
+Client
+  │
+  ▼
+Spring Security filter chain ── JwtAuthenticationFilter (validates Bearer token)
+  │
+  ▼
+Controllers ──► Rate limiter (Bucket4j, POST /api/shorten only)
+  │
+  ▼
+UrlService
+  ├── redirect:  Redis cache (key "urls::<code>", TTL 24h)
+  │                 │ miss
+  │                 ▼
+  │              MySQL (Spring Data JPA)
+  └── create / delete: MySQL, and the Redis entry is evicted on delete
 ```
 
-- Short codes are Base62 of `100000 + the row's database id`. The database assigns the id, so codes stay unique across restarts and multiple instances.
-- `schema-mysql.sql` makes `short_code` and `long_url` case-sensitive (binary collation). MySQL's default collation is case-insensitive, which would make `q1a` and `q1A` collide and treat URL paths that differ only in case as the same URL.
-- `JwtAuthenticationFilter` runs once per request, validates the bearer token, and populates the Spring Security context so `@AuthenticationPrincipal` resolves the current user in controllers.
-- Public endpoints (`/`, static pages, `/auth/**`, Swagger, and all `GET` requests for redirects) bypass authentication; `/api/**` requires a valid JWT.
+**How a short code is created**
+1. The URL is inserted with a temporary unique placeholder to obtain the auto-increment id.
+2. The final code is `Base62(100000 + id)` (for example id 3 becomes `q0X`), saved in the same transaction.
+3. If the same user submits the same URL again, the existing code is returned.
+
+**Why the MySQL columns are case-sensitive.** MySQL's default collation is case-insensitive, which would make `q1a` and `q1A` collide on the unique index and would treat `https://x.com/Doc` and `https://x.com/doc` as the same URL. `src/main/resources/schema-mysql.sql` switches `short_code` and `long_url` to binary collations after Hibernate creates the tables. It runs automatically with the `local`, `docker` and `prod` profiles.
+
+## API Reference
+
+Base URL locally: `http://localhost:8080`. Interactive docs: `/swagger-ui.html`.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/register` | public | Create an account (`name`, `email`, `password` of 8–72 characters) |
+| POST | `/auth/login` | public | Returns a JWT in `data.token` |
+| POST | `/api/shorten` | Bearer token | Create a short URL (5 requests/min per IP) |
+| GET | `/api/urls` | Bearer token | List the caller's URLs |
+| DELETE | `/api/urls/{shortCode}` | Bearer token | Delete one of the caller's URLs |
+| GET | `/{code}` | public | `302` redirect to the original URL, or `404` |
+
+**Example**
+
+```bash
+# register and log in
+curl -X POST localhost:8080/auth/register -H "Content-Type: application/json" \
+  -d '{"name":"Jane","email":"jane@example.com","password":"secret123"}'
+
+TOKEN=$(curl -s -X POST localhost:8080/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"jane@example.com","password":"secret123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['token'])")
+
+# shorten a URL
+curl -X POST localhost:8080/api/shorten -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -d '{"longUrl":"https://example.com"}'
+# -> {"success":true,"message":"Short URL created successfully","data":{"shortUrl":"http://localhost:8080/q0U","longUrl":"https://example.com"}}
+
+# follow the short link
+curl -i localhost:8080/q0U          # HTTP/1.1 302, Location: https://example.com
+```
+
+**Status codes:** `200` success · `400` validation error · `401` missing, invalid or expired token, or wrong credentials · `404` unknown code or URL not owned by the caller · `409` email already registered · `429` rate limit exceeded.
 
 ## Running Locally
 
 ### Prerequisites
-- Java 21+
-- Maven 3.9+
-- MySQL 8 and Redis running locally - the easiest way is `docker compose up -d mysql redis`
+- Java 21 or newer
+- Docker (for MySQL and Redis)
 
-### Setup
+### Steps
 
-1. Clone the repo:
-```
+```bash
 git clone https://github.com/MADHURI-HS/url-shortener.git
 cd url-shortener
-```
 
-2. Start MySQL and Redis: `docker compose up -d mysql redis` (the `urlshortener` database is created automatically).
+# 1. start MySQL and Redis (the "urlshortener" database is created automatically)
+docker compose up -d mysql redis
 
-3. Set required environment variables:
-```
-# both are optional locally (defaults: root / a development-only secret)
-export LOCAL_DB_PASSWORD=your_mysql_password
-export JWT_SECRET=a_random_secret_of_at_least_32_characters
-```
-
-4. Run the application:
-```
+# 2. run the app (uses the "local" profile by default)
 ./mvnw spring-boot:run
 ```
-Uses the `local` Spring profile by default, connecting to MySQL and Redis on `localhost`.
 
-5. Test it:
-```
-open http://localhost:8080/swagger-ui.html
-```
+Open http://localhost:8080 for the web UI or http://localhost:8080/swagger-ui.html for the API docs.
 
-### Run with Docker Compose
+The `local` profile has development defaults (MySQL user `root`, password `root`, and a development-only JWT secret), so no environment variables are required. To override them, set `LOCAL_DB_USERNAME`, `LOCAL_DB_PASSWORD` or `JWT_SECRET`.
 
-```
+### Everything in Docker
+
+```bash
 docker compose up --build
 ```
-Spins up the app, MySQL, and Redis together using the `docker` Spring profile.
 
-## Tests
+Starts MySQL, Redis and the app together using the `docker` profile.
 
-```
+## Configuration
+
+| Variable | Used by | Description |
+|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | all | `local` (default), `docker` or `prod` |
+| `JWT_SECRET` | docker, prod | Signing secret, **at least 32 characters** |
+| `SPRING_DATASOURCE_URL` | docker, prod | e.g. `jdbc:mysql://HOST:3306/DB?useSSL=true&serverTimezone=UTC` |
+| `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | docker, prod | Database credentials |
+| `REDIS_URL` | prod | e.g. `rediss://default:PASSWORD@HOST:6379` |
+| `REDIS_HOST` / `REDIS_PORT` | docker | Redis location in Compose |
+| `APP_BASE_URL` | docker, prod | Public URL used to build short links |
+| `PORT` | optional | HTTP port, default 8080 |
+
+No secrets are committed. Production values come from environment variables only.
+
+## Testing
+
+```bash
 ./mvnw test
 ```
-JUnit 5 + Mockito unit tests (services, controllers, JWT, rate limiter, Base62, validation), a Spring Cache test, and an end-to-end flow test (register -> login -> shorten -> redirect -> delete) that runs on in-memory H2 with the `test` profile - no MySQL or Redis required.
+
+**60 automated tests**, no MySQL or Redis required:
+
+- **Unit tests (JUnit 5 + Mockito):** `UrlService`, `AuthService`, `JwtService`, rate limiter, Base62 encoder and request validation.
+- **Controller tests (MockMvc + mocked services):** auth, URL management and redirect endpoints, including 400, 401, 404, 409 and 429 responses.
+- **Cache test:** verifies that repeated lookups hit the database once, that deleting a link evicts it, and that misses are not cached.
+- **End-to-end flow test:** register, login, shorten, redirect, list, delete, and the redirect afterwards returning 404, through the real Spring context and security filter chain on in-memory H2.
+
+> Tests run on H2, not MySQL, so MySQL-specific behavior (such as the collation described above) is verified manually. Testcontainers would be the next step.
 
 ## Deployment
 
-Deployed on [Render](https://render.com) using the multi-stage Dockerfile, with:
-- **MySQL** — any hosted MySQL 8 (Render only offers managed PostgreSQL, so use e.g. Aiven, Railway or TiDB Cloud and set `SPRING_DATASOURCE_URL/USERNAME/PASSWORD`)
-- **Redis** — managed instance on [Upstash](https://upstash.com)
+The demo is deployed on **Render** using the multi-stage `Dockerfile`:
 
-Configuration is handled entirely through environment variables (`SPRING_PROFILES_ACTIVE=prod`), keeping credentials out of source control.
+1. Create a MySQL 8 database on any provider that offers one (Render itself only offers PostgreSQL) and a Redis instance (for example Upstash).
+2. Create a Render web service from this repository (Docker runtime).
+3. Set the environment variables from the [Configuration](#configuration) table, with `SPRING_PROFILES_ACTIVE=prod`.
+4. Deploy. Hibernate creates the tables on first start and `schema-mysql.sql` then applies the case-sensitive collations.
+
+**About free-tier hosting.** Render's free web services sleep after about 15 minutes of inactivity and take 30–90 seconds to wake. Options if this matters:
+- accept it for a portfolio demo (it is noted at the top of this README),
+- keep the service warm with an external pinger such as UptimeRobot or cron-job.org (free, but not an officially supported fix), or
+- move to a paid instance, which stays running.
+
+## Design Decisions
+
+- **Short codes derived from the database id** instead of random strings or an in-memory counter, so there are no collisions and no coordination between instances.
+- **302 (not 301) redirects** so every click reaches the server, which keeps deletion effective and leaves room for click analytics.
+- **Cache-aside with explicit eviction** on delete and no caching of misses, so a link stops working immediately and a newly created code is never hidden.
+- **Stateless JWT authentication** with a short expiry. Rate limiting is applied only to link creation, which is the expensive write path.
+- **Binary collation on `short_code` and `long_url`** because Base62 codes and URL paths are case-sensitive.
+- **Client IP for rate limiting** is read from `CF-Connecting-IP` (set by Cloudflare, which sits in front of Render), then `X-Forwarded-For`, then the remote address.
 
 ## Known Limitations
 
-- Rate-limit buckets live in memory per instance (not shared across instances) and are never evicted.
-- The tests run on in-memory H2, not MySQL; MySQL-specific behavior (such as collation) is covered by `schema-mysql.sql` but not by automated tests. Testcontainers would close that gap.
-- JWTs are kept in `localStorage` (readable by any script on the page) and tokens cannot be revoked before they expire (15 minutes).
-- `spring.jpa.hibernate.ddl-auto=update` is convenient but a migration tool such as Flyway is the production-grade choice.
-- `JWT_SECRET` must be at least 32 characters (256 bits), otherwise token signing fails.
+- Rate-limit counters are in memory per instance and never evicted; with several instances they would not be shared.
+- The JWT is stored in `localStorage` (readable by any script on the page) and cannot be revoked before it expires. Refresh tokens and `HttpOnly` cookies would be stronger.
+- There is no email verification or password reset.
+- `spring.jpa.hibernate.ddl-auto=update` is convenient; a migration tool such as Flyway is the production-grade choice.
+- Duplicate detection (`findByLongUrlAndUser`) scans the `long_url` column without an index, which is fine for a small dataset but would need a hash column at scale.
+- Free-tier hosting causes the cold starts described above.
+
+## Future Enhancements
+
+- Flyway migrations and Testcontainers-based tests against real MySQL and Redis
+- Click analytics (counts, referrers, timestamps)
+- Custom aliases and link expiry
+- Prometheus and Grafana metrics for cache hit rate and latency
+- Distributed rate limiting with Redis (Bucket4j Redis integration)
+- CI pipeline (GitHub Actions) to run the tests on every push
+
+## Project Structure
+
+```
+src/main/java/com/urlshortener
+├── config/        Swagger / OpenAPI configuration
+├── controller/    Auth, URL management, redirect and home controllers
+├── dto/           Request and response objects with validation
+├── exception/     Custom exceptions and the global exception handler
+├── model/         JPA entities (User, Url)
+├── repository/    Spring Data repositories
+├── security/      JWT service, authentication filter, security configuration
+├── service/       Auth, URL and rate-limiter services
+└── util/          Base62 encoder
+src/main/resources
+├── application*.properties   common + local / docker / prod profiles
+├── schema-mysql.sql          case-sensitive columns for MySQL
+└── static/                   web UI (HTML, CSS, JavaScript)
+src/test                      unit, controller, cache and end-to-end tests
+```
 
 ## License
 
 This project is open source and available for learning and reference purposes.
 
-## Future Enhancements
-While this architecture works perfectly for a single-instance deployment, scaling it horizontally would require a few adjustments:
-- **Monitoring:** Integrating Prometheus and Grafana for real-time metrics on cache hit rates and API latency.
-- **Centralized Cache Eviction:** Implementing a webhook or messaging queue (RabbitMQ) to ensure cache consistency if the database is updated outside of the application layer.
+## Author
+
+**Madhuri H S** · [LinkedIn](https://www.linkedin.com/in/madhuri-h-s/) · [GitHub](https://github.com/MADHURI-HS)
